@@ -1,6 +1,0 @@
-build
-debbuild
-rpmbuild
-sources
-src
-*.tar
