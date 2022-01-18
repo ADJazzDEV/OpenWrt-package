@@ -6,5 +6,5 @@
 
 #### 使用
 ```
-src-git packages https://github.com/ADJazzDEV/OpenWrt-package;test
+src-git cpackage https://github.com/ADJazzDEV/OpenWrt-package;test
 ```
