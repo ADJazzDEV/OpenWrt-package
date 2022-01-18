@@ -1,14 +1,10 @@
-#### 目前编译错误插件有
-
-`shadowsocksr-libev`
-
 #### 说明
 
-* 该仓只在[云编译](https://github.com/ADJazzDEV/OpenWrt)用过，别的地方没试过
+* 该分支作为[lede](https://github.com/coolsnowwolf/openwrt)的补充
 
-* 仓库不定期更新
+* 该分支只在[云编译](https://github.com/ADJazzDEV/OpenWrt)用过，别的地方没试过
 
 #### 使用
 ```
-src-git adjazz https://github.com/ADJazzDEV/OpenWrt-package
+src-git packages https://github.com/ADJazzDEV/OpenWrt-package;c
 ```
