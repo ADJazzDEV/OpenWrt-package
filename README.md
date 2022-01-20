@@ -1,7 +1,3 @@
-#### 目前编译错误插件有
-
-`shadowsocksr-libev`
-
 #### 说明
 
 * 该仓只在[云编译](https://github.com/ADJazzDEV/OpenWrt)用过，别的地方没试过
