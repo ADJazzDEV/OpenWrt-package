@@ -71,12 +71,7 @@ local redir_mode_validate = function(self, value, t)
     return value
 end
 
-local status = m:get("@global_other[0]", "status") or ""
-if status:find("big_icon") then
-    m:append(Template(appname .. "/global/status"))
-else
-    m:append(Template(appname .. "/global/status2"))
-end
+m:append(Template(appname .. "/global/status"))
 
 s = m:section(TypedSection, "global")
 s.anonymous = true
@@ -171,10 +166,24 @@ end
 
 udp_node = s:taboption("Main", ListValue, "udp_node", "<a style='color: red'>" .. translate("UDP Node") .. "</a>")
 udp_node:value("nil", translate("Close"))
---udp_node.description = translate("For proxy game network, DNS hijack etc.") .. "<br />" .. translate("The selected server will not use Kcptun.")
+--udp_node.description = translate("For proxy game network.")
 udp_node:value("tcp", translate("Same as the tcp node"))
 
 s:tab("DNS", translate("DNS"))
+
+if api.is_finded("smartdns") then
+    dns_shunt = s:taboption("DNS", ListValue, "dns_shunt", translate("DNS Shunt"))
+    dns_shunt:value("dnsmasq", "Dnsmasq")
+    dns_shunt:value("smartdns", "SmartDNS")
+
+    group_domestic = s:taboption("DNS", Value, "group_domestic", translate("Domestic group name"))
+    group_domestic.placeholder = "local"
+    group_domestic:depends("dns_shunt", "smartdns")
+    group_domestic.description = translate("You only need to configure domestic DNS packets in SmartDNS and set it redirect or as Dnsmasq upstream, and fill in the domestic DNS group name here.")
+end
+
+o = s:taboption("DNS", Flag, "filter_proxy_ipv6", translate("Filter Proxy Host IPv6"), translate("Experimental feature."))
+o.default = "0"
 
 ---- DNS Forward Mode
 dns_mode = s:taboption("DNS", ListValue, "dns_mode", translate("Filter Mode"))
@@ -193,7 +202,6 @@ if has_xray then
     dns_mode:value("xray", "Xray")
 end
 dns_mode:value("udp", translatef("Requery DNS By %s", "UDP"))
-dns_mode:value("fakedns", "FakeDNS")
 
 o = s:taboption("DNS", ListValue, "v2ray_dns_mode", " ")
 o:value("tcp", "TCP")
@@ -266,16 +274,6 @@ o.datatype = "ipaddr"
 o:depends("v2ray_dns_mode", "tcp")
 o:depends("v2ray_dns_mode", "doh")
 
-o = s:taboption("DNS", ListValue, "dns_query_strategy", translate("Query Strategy"))
-o.default = "UseIPv4"
-o:value("UseIPv4")
-o:value("UseIPv6")
-o:value("UseIP")
-o:depends({dns_mode = "v2ray", v2ray_dns_mode = "tcp"})
-o:depends({dns_mode = "v2ray", v2ray_dns_mode = "doh"})
-o:depends({dns_mode = "xray", v2ray_dns_mode = "tcp"})
-o:depends({dns_mode = "xray", v2ray_dns_mode = "doh"})
-
 o = s:taboption("DNS", Flag, "dns_cache", translate("Cache Resolved"))
 o.default = "1"
 o:depends({dns_mode = "dns2socks"})
@@ -288,7 +286,7 @@ o.rmempty = false
 
 if has_chnlist and api.is_finded("chinadns-ng") then
     o = s:taboption("DNS", Flag, "chinadns_ng", translate("ChinaDNS-NG"), translate("The effect is better, but will increase the memory."))
-    o.default = "1"
+    o.default = "0"
     o:depends({dns_mode = "dns2socks"})
     o:depends({dns_mode = "pdnsd"})
     o:depends({dns_mode = "v2ray", v2ray_dns_mode = "tcp"})
@@ -297,9 +295,6 @@ if has_chnlist and api.is_finded("chinadns-ng") then
     o:depends({dns_mode = "xray", v2ray_dns_mode = "doh"})
     o:depends({dns_mode = "udp"})
 end
-
-o = s:taboption("DNS", Flag, "filter_proxy_ipv6", translate("Filter Proxy Host IPv6"), translate("Experimental feature."))
-o.default = "0"
 
 o = s:taboption("DNS", Button, "clear_ipset", translate("Clear IPSET"), translate("Try this feature if the rule modification does not take effect."))
 o.inputstyle = "remove"
