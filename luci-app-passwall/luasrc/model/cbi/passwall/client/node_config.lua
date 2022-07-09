@@ -42,7 +42,7 @@ local v_ss_encrypt_method_list = {
 }
 
 local x_ss_encrypt_method_list = {
-    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "xchacha20-poly1305"
+    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "xchacha20-poly1305", "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305"
 }
 
 local security_list = {"none", "auto", "aes-128-gcm", "chacha20-poly1305", "zero"}
@@ -141,23 +141,25 @@ balancing_node:depends("protocol", "_balancing")
 
 -- 分流
 uci:foreach(appname, "shunt_rules", function(e)
-    o = s:option(ListValue, e[".name"], string.format('* <a href="%s" target="_blank">%s</a>', api.url("shunt_rules", e[".name"]), translate(e.remarks)))
-    o:value("nil", translate("Close"))
-    o:value("_default", translate("Default"))
-    o:value("_direct", translate("Direct Connection"))
-    o:value("_blackhole", translate("Blackhole"))
-    o:depends("protocol", "_shunt")
+    if e[".name"] and e.remarks then
+        o = s:option(ListValue, e[".name"], string.format('* <a href="%s" target="_blank">%s</a>', api.url("shunt_rules", e[".name"]), e.remarks))
+        o:value("nil", translate("Close"))
+        o:value("_default", translate("Default"))
+        o:value("_direct", translate("Direct Connection"))
+        o:value("_blackhole", translate("Blackhole"))
+        o:depends("protocol", "_shunt")
 
-    if #nodes_table > 0 then
-        _proxy_tag = s:option(ListValue, e[".name"] .. "_proxy_tag", string.format('* <a style="color:red">%s</a>', translate(e.remarks) .. " " .. translate("Preproxy")))
-        _proxy_tag:value("nil", translate("Close"))
-        _proxy_tag:value("default", translate("Default"))
-        _proxy_tag:value("main", translate("Default Preproxy"))
-        _proxy_tag.default = "nil"
+        if #nodes_table > 0 then
+            _proxy_tag = s:option(ListValue, e[".name"] .. "_proxy_tag", string.format('* <a style="color:red">%s</a>', e.remarks .. " " .. translate("Preproxy")))
+            _proxy_tag:value("nil", translate("Close"))
+            _proxy_tag:value("default", translate("Default"))
+            _proxy_tag:value("main", translate("Default Preproxy"))
+            _proxy_tag.default = "nil"
 
-        for k, v in pairs(nodes_table) do
-            o:value(v.id, v.remarks)
-            _proxy_tag:depends(e[".name"], v.id)
+            for k, v in pairs(nodes_table) do
+                o:value(v.id, v.remarks)
+                _proxy_tag:depends(e[".name"], v.id)
+            end
         end
     end
 end)
@@ -254,32 +256,6 @@ address:depends({ type = "Xray", protocol = "http" })
 address:depends({ type = "Xray", protocol = "socks" })
 address:depends({ type = "Xray", protocol = "shadowsocks" })
 address:depends({ type = "Xray", protocol = "trojan" })
-
---[[
-use_ipv6 = s:option(Flag, "use_ipv6", translate("Use IPv6"))
-use_ipv6.default = 0
-use_ipv6:depends("type", "Socks")
-use_ipv6:depends("type", "SS")
-use_ipv6:depends("type", "SS-Rust")
-use_ipv6:depends("type", "SSR")
-use_ipv6:depends("type", "Brook")
-use_ipv6:depends("type", "Trojan")
-use_ipv6:depends("type", "Trojan-Plus")
-use_ipv6:depends("type", "Trojan-Go")
-use_ipv6:depends("type", "Hysteria")
-use_ipv6:depends({ type = "V2ray", protocol = "vmess" })
-use_ipv6:depends({ type = "V2ray", protocol = "vless" })
-use_ipv6:depends({ type = "V2ray", protocol = "http" })
-use_ipv6:depends({ type = "V2ray", protocol = "socks" })
-use_ipv6:depends({ type = "V2ray", protocol = "shadowsocks" })
-use_ipv6:depends({ type = "V2ray", protocol = "trojan" })
-use_ipv6:depends({ type = "Xray", protocol = "vmess" })
-use_ipv6:depends({ type = "Xray", protocol = "vless" })
-use_ipv6:depends({ type = "Xray", protocol = "http" })
-use_ipv6:depends({ type = "Xray", protocol = "socks" })
-use_ipv6:depends({ type = "Xray", protocol = "shadowsocks" })
-use_ipv6:depends({ type = "Xray", protocol = "trojan" })
---]]
 
 port = s:option(Value, "port", translate("Port"))
 port.datatype = "port"
@@ -428,6 +404,9 @@ end
 iv_check = s:option(Flag, "iv_check", translate("IV Check"))
 iv_check:depends({ type = "V2ray", protocol = "shadowsocks" })
 iv_check:depends({ type = "Xray", protocol = "shadowsocks" })
+
+uot = s:option(Flag, "uot", translate("UDP over TCP"), translate("Need Xray server side with Shadowsocks-2022 protocol"))
+uot:depends({ type = "Xray", protocol = "shadowsocks" })
 
 ssr_protocol = s:option(Value, "ssr_protocol", translate("Protocol"))
 for a, t in ipairs(ssr_protocol_list) do ssr_protocol:value(t) end
@@ -713,17 +692,14 @@ ws_path:depends("trojan_transport", "ws")
 ws_path:depends({ type = "Brook", brook_protocol = "wsclient" })
 
 ws_enableEarlyData = s:option(Flag, "ws_enableEarlyData", translate("Enable early data"))
-ws_enableEarlyData:depends("transport", "ws")
+ws_enableEarlyData:depends({ type = "V2ray", transport = "ws" })
 
 ws_maxEarlyData = s:option(Value, "ws_maxEarlyData", translate("Early data length"))
 ws_maxEarlyData.default = "1024"
 ws_maxEarlyData:depends("ws_enableEarlyData", true)
-function ws_maxEarlyData.cfgvalue(self, section)
-	return m:get(section, "ws_maxEarlyData")
-end
-function ws_maxEarlyData.write(self, section, value)
-	m:set(section, "ws_maxEarlyData", value)
-end
+
+ws_earlyDataHeaderName = s:option(Value, "ws_earlyDataHeaderName", translate("Early data header name"), translate("Recommended value: Sec-WebSocket-Protocol"))
+ws_earlyDataHeaderName:depends("ws_enableEarlyData", true)
 
 -- [[ HTTP/2部分 ]]--
 h2_host = s:option(Value, "h2_host", translate("HTTP/2 Host"))

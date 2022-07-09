@@ -14,6 +14,9 @@ command_timeout = 300
 LEDE_BOARD = nil
 DISTRIB_TARGET = nil
 
+LOG_FILE = "/tmp/log/" .. appname .. ".log"
+CACHE_PATH = "/tmp/etc/" .. appname .. "_tmp"
+
 function base64Decode(text)
 	local raw = text
 	if not text then return '' end
@@ -68,6 +71,21 @@ function repeat_exist(table, value)
     return false
 end
 
+function remove(...)
+    for index, value in ipairs({...}) do
+        if value and #value > 0 and value ~= "/" then
+            sys.call(string.format("rm -rf %s", value))
+        end
+    end
+end
+
+function is_install(package)
+    if package and #package > 0 then
+        return sys.call(string.format('opkg list-installed | grep "%s" > /dev/null 2>&1', package)) == 0
+    end
+    return false
+end
+
 function get_args(arg)
     local var = {}
     for i, arg_k in pairs(arg) do
@@ -103,6 +121,9 @@ function is_special_node(e)
 end
 
 function is_ip(val)
+    if is_ipv6(val) then
+        val = get_ipv6_only(val)
+    end
     return datatypes.ipaddr(val)
 end
 
@@ -126,6 +147,28 @@ function is_ipv6addrport(val)
         end
     end
     return false
+end
+
+function get_ipv6_only(val)
+    local result = ""
+    if is_ipv6(val) then
+        result = val
+        if val:match('%[(.*)%]') then
+            result = val:match('%[(.*)%]')
+        end
+    end
+    return result
+end
+
+function get_ipv6_full(val)
+    local result = ""
+    if is_ipv6(val) then
+        result = val
+        if not val:match('%[(.*)%]') then
+            result = "[" .. result .. "]"
+        end
+    end
+    return result
 end
 
 function get_ip_type(val)
@@ -163,6 +206,14 @@ function iprange(val)
     return false
 end
 
+function get_domain_from_url(url)
+    local domain = string.match(url, "//([^/]+)")
+    if domain then
+        return domain
+    end
+    return url
+end
+
 function get_valid_nodes()
     local nodes_ping = uci_get_type("global_other", "nodes_ping") or ""
     local nodes = {}
@@ -176,10 +227,9 @@ function get_valid_nodes()
             end
             if e.port and e.address then
                 local address = e.address
-                if datatypes.ipaddr(address) or datatypes.hostname(address) then
-                    local type2 = e.type
-                    local address2 = address
-                    if (type2 == "V2ray" or type2 == "Xray") and e.protocol then
+                if is_ip(address) or datatypes.hostname(address) then
+                    local type = e.type
+                    if (type == "V2ray" or type == "Xray") and e.protocol then
                         local protocol = e.protocol
                         if protocol == "vmess" then
                             protocol = "VMess"
@@ -188,12 +238,12 @@ function get_valid_nodes()
                         else
                             protocol = protocol:gsub("^%l",string.upper)
                         end
-                        type2 = type2 .. " " .. protocol
+                        type = type .. " " .. protocol
                     end
-                    if datatypes.ip6addr(address) then address2 = "[" .. address .. "]" end
-                    e["remark"] = "%s：[%s]" % {type2, e.remarks}
+                    if is_ipv6(address) then address = get_ipv6_full(address) end
+                    e["remark"] = "%s：[%s]" % {type, e.remarks}
                     if nodes_ping:find("info") then
-                        e["remark"] = "%s：[%s] %s:%s" % {type2, e.remarks, address2, e.port}
+                        e["remark"] = "%s：[%s] %s:%s" % {type, e.remarks, address, e.port}
                     end
                     e.node_type = "normal"
                     nodes[#nodes + 1] = e
@@ -268,7 +318,6 @@ function is_finded(e)
     return luci.sys.exec('type -t -p "/bin/%s" -p "%s" "%s"' % {e, get_customed_path(e), e}) ~= "" and true or false
 end
 
-
 function clone(org)
     local function copy(org, res)
         for k,v in pairs(org) do
@@ -295,8 +344,10 @@ function get_bin_version_cache(file, cmd)
             return sys.exec("echo -n $(cat /tmp/etc/passwall_tmp/%s)" % md5)
         else
             local version = sys.exec(string.format("echo -n $(%s %s)", file, cmd))
-            sys.call("echo '" .. version .. "' > " .. "/tmp/etc/passwall_tmp/" .. md5)
-            return version
+            if version and version ~= "" then
+                sys.call("echo '" .. version .. "' > " .. "/tmp/etc/passwall_tmp/" .. md5)
+                return version
+            end
         end
     end
     return ""
@@ -309,7 +360,7 @@ end
 
 function get_v2ray_version(file)
     if file == nil then file = get_v2ray_path() end
-    local cmd = "-version | awk '{print $2}' | sed -n 1P"
+    local cmd = "version | awk '{print $2}' | sed -n 1P"
     return get_bin_version_cache(file, cmd)
 end
 

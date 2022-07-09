@@ -18,6 +18,10 @@ function s.create(e, t)
     t = TypedSection.create(e, t)
     luci.http.redirect(e.extedit:format(t))
 end
+function s.remove(e, t)
+    sys.call("rm -rf /tmp/etc/passwall_tmp/dns_" .. t .. "*")
+    TypedSection.remove(e, t)
+end
 
 ---- Enable
 o = s:option(Flag, "enabled", translate("Enable"))
@@ -55,7 +59,7 @@ o.cfgvalue = function(t, n)
 end
 
 ---- TCP Proxy Mode
-tcp_proxy_mode = s:option(ListValue, "tcp_proxy_mode", translatef("%s Proxy Mode", "TCP"))
+tcp_proxy_mode = s:option(ListValue, "tcp_proxy_mode", "TCP " .. translate("Proxy Mode"))
 tcp_proxy_mode.default = "default"
 tcp_proxy_mode.rmempty = false
 tcp_proxy_mode:value("default", translate("Default"))
@@ -70,7 +74,7 @@ end
 tcp_proxy_mode:value("direct/proxy", translate("Only use direct/proxy list"))
 
 ---- UDP Proxy Mode
-udp_proxy_mode = s:option(ListValue, "udp_proxy_mode", translatef("%s Proxy Mode", "UDP"))
+udp_proxy_mode = s:option(ListValue, "udp_proxy_mode", "UDP " .. translate("Proxy Mode"))
 udp_proxy_mode.default = "default"
 udp_proxy_mode.rmempty = false
 udp_proxy_mode:value("default", translate("Default"))

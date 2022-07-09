@@ -1,5 +1,5 @@
 -- Copyright (C) 2018-2020 L-WRT Team
--- Copyright (C) 2021 xiaorouji
+-- Copyright (C) 2021-2022 xiaorouji
 
 module("luci.controller.passwall", package.seeall)
 local api = require "luci.model.cbi.passwall.api.api"
@@ -181,7 +181,7 @@ end
 function status()
 	-- local dns_mode = ucic:get(appname, "@global[0]", "dns_mode")
 	local e = {}
-	e.dns_mode_status = luci.sys.call("netstat -apn | grep ':7913 ' >/dev/null") == 0
+	e.dns_mode_status = luci.sys.call("netstat -apn | grep ':15353 ' >/dev/null") == 0
 	e.haproxy_status = luci.sys.call(string.format("top -bn1 | grep -v grep | grep '%s/bin/' | grep haproxy >/dev/null", appname)) == 0
 	e["tcp_node_status"] = luci.sys.call(string.format("top -bn1 | grep -v -E 'grep|acl/|acl_' | grep '%s/bin/' | grep -i 'TCP' >/dev/null", appname)) == 0
 
@@ -243,6 +243,9 @@ function ping_node()
 	e.index = index
 	local nodes_ping = ucic:get(appname, "@global_other[0]", "nodes_ping") or ""
 	if nodes_ping:find("tcping") and luci.sys.exec("echo -n $(command -v tcping)") ~= "" then
+		if api.is_ipv6(address) then
+			address = api.get_ipv6_only(address)
+		end
 		e.ping = luci.sys.exec(string.format("echo -n $(tcping -q -c 1 -i 1 -t 2 -p %s %s 2>&1 | grep -o 'time=[0-9]*' | awk -F '=' '{print $2}') 2>/dev/null", port, address))
 	end
 	if e.ping == nil or tonumber(e.ping) == 0 then
